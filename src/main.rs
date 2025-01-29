@@ -245,26 +245,46 @@ async fn extract_log(url: &str) -> Result<(), Box<dyn std::error::Error>> {
             // Extract the previous 10 lines
             break;
         } else if line.starts_with("+ ") {
+            // Search for lines starting with "+ " or "spawn"
             let line = &line[2..];
             if line.starts_with("[[") ||  // Skip "[[ 657247bda89d60112d79bb9b8d223eca5f9641b5 != '' ]]"
                 line.starts_with("set ")  // Skip "set +x"
                 { continue; }
             println!("line={line}");
         }
+        /*
+Include Commit Info
+<<
++ git reset --hard 657247bda89d60112d79bb9b8d223eca5f9641b5
+HEAD is now at 657247bda8 libc/modlib: preprocess gnu-elf.ld
+NuttX Source: https://github.com/apache/nuttx/tree/657247bda89d60112d79bb9b8d223eca5f9641b5
+NuttX Apps: https://github.com/apache/nuttx-apps/tree/a6b9e718460a56722205c2a84a9b07b94ca664aa
+>>
+
+Include QEMU and OpenSBI version
+<<
++ qemu-system-riscv64 --version
+QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.4)
+
++ expect ./qemu-riscv-knsh64.exp
+spawn qemu-system-riscv64 -semihosting -M virt,aclint=on -cpu rv64 -kernel nuttx -nographic
+
+OpenSBI v1.3
+>>
+
+Extract 5 lines:
+"+ git reset "
+"NuttX Source: "
+"NuttX Apps: "
+"+ qemu"
+"+ expect ./qemu"         
+*/
     }
 
     Ok(())
 }
 
 /*
-url="https://gitlab.com/lupyuen/nuttx-build-log/-/snippets/4799962#L85"
-
-Starting at Line 85: Search for lines starting with "+ " or "spawn"
-
-wget https://gitlab.com/lupyuen/nuttx-build-log/-/snippets/4799962/raw/main/ci-unknown.log
-grep "^+ " ci-unknown.log
-
-<<
 + /home/luppy/nuttx-build-farm/build-test-knsh64.sh 657247bda89d60112d79bb9b8d223eca5f9641b5 a6b9e718460a56722205c2a84a9b07b94ca664aa
 + nuttx_hash=657247bda89d60112d79bb9b8d223eca5f9641b5
 + apps_hash=a6b9e718460a56722205c2a84a9b07b94ca664aa
@@ -300,34 +320,4 @@ grep "^+ " ci-unknown.log
 + wget https://raw.githubusercontent.com/lupyuen/nuttx-riscv64/main/qemu-riscv-knsh64.exp
 spawn qemu-system-riscv64 -semihosting -M virt,aclint=on -cpu rv64 -kernel nuttx -nographic
 + expect ./qemu-riscv-knsh64.exp
->>
-
-Include Commit Info
-<<
-+ git reset --hard 657247bda89d60112d79bb9b8d223eca5f9641b5
-HEAD is now at 657247bda8 libc/modlib: preprocess gnu-elf.ld
-NuttX Source: https://github.com/apache/nuttx/tree/657247bda89d60112d79bb9b8d223eca5f9641b5
-NuttX Apps: https://github.com/apache/nuttx-apps/tree/a6b9e718460a56722205c2a84a9b07b94ca664aa
->>
-
-Include QEMU and OpenSBI version
-<<
-+ qemu-system-riscv64 --version
-QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.4)
-
-+ expect ./qemu-riscv-knsh64.exp
-spawn qemu-system-riscv64 -semihosting -M virt,aclint=on -cpu rv64 -kernel nuttx -nographic
-
-OpenSBI v1.3
->>
-
-Extract 5 lines:
-"+ git reset "
-"NuttX Source: "
-"NuttX Apps: "
-"+ qemu"
-"+ expect ./qemu"
-
-Search for lines starting with "===== Error: Test Failed" or "===== Test OK"
-Backtrack last 10 lines
  */
