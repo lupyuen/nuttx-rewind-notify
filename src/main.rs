@@ -70,14 +70,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Ok(file) = File::open(ALL_BUILDS_FILENAME) {
         let reader = BufReader::new(file);
         all_builds = serde_json::from_reader(reader).unwrap();
-        println!("\nall_builds=\n{}", to_string_pretty(&all_builds).unwrap());
+        // println!("\nall_builds=\n{}", to_string_pretty(&all_builds).unwrap());
     }
 
-    // For Each Failed Build...
+    // For Each Breaking Commit...
     for build in builds.as_array().unwrap() {
-        println!("build=\n{}", to_string_pretty(build).unwrap());
+        // println!("build=\n{}", to_string_pretty(build).unwrap());
         let metric = &build["metric"];
-        println!("metric=\n{}", to_string_pretty(metric).unwrap());
+        // println!("metric=\n{}", to_string_pretty(metric).unwrap());
 
         // Get the Previous NuttX Hash (Last Successful Commit)
         let nuttx_hash_prev = metric["nuttx_hash_prev"].as_str().unwrap();
@@ -93,7 +93,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("board={board}");
         println!("config={config}");
         println!("user={user}");
-        println!("msg=\n<<\n{msg}\n>>");
+        // println!("msg=\n<<\n{msg}\n>>");
+
+        // Get the Previous Log URL (Last Successful Commit)
+        // TODO
 
         // Get the Breaking PR from GitHub, based on the Breaking Commit
         // https://docs.github.com/en/rest/commits/commits?apiVersion=2022-11-28#list-pull-requests-associated-with-a-commit
@@ -106,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .header("X-GitHub-Api-Version", "2022-11-28")
             .send()
             .await?;
-        println!("res={res:?}");
+        // println!("res={res:?}");
         if !res.status().is_success() {
             println!("*** GitHub Failed: {user} @ {target}");
             sleep(Duration::from_secs(30));
@@ -115,7 +118,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // println!("Status: {}", res.status());
         // println!("Headers:\n{:#?}", res.headers());
         let body = res.text().await?;
-        println!("Body: {body}");
+        // println!("Body: {body}");
+        let pull_requests: Value = serde_json::from_str(&body).unwrap();
+        println!("pull_requests=\n{pull_requests:#}");
+        let pr = &pull_requests[0];
+        let pr_url = pr["url"].as_str().unwrap();
+        let pr_user = pr["user"]["login"].as_str().unwrap();
+        println!("pr_url={pr_url}");
+        println!("pr_user={pr_user}");
 
         // Read the Build Log
 
