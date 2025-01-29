@@ -1,4 +1,4 @@
-//! (1) Fetch the Failed NuttX Builds from Prometheus
+//! (1) Fetch the Completed Rewind Build (Breaking Commit) from Prometheus
 //! (2) Post to Mastodon
 
 use std::{
@@ -36,15 +36,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
     // let args = Args::parse();
 
-    // Fetch the Failed Builds from Prometheus
+    // Fetch the Breaking Commit from Prometheus
     let query = r##"
         build_score{
-            config!="leds64_zig",
-            user!="rewind",
-            user!="nuttxlinux",
-            user!="nuttxmacos",
-            user!="jerpelea"
-        } < 0.5
+            target="rv-virt:knsh64_test5",
+            build_score_prev="1"
+        } == 0
     "##;
     println!("query={query}");
     let params = [("query", query)];
@@ -81,16 +78,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("build=\n{}", to_string_pretty(build).unwrap());
         let metric = &build["metric"];
         println!("metric=\n{}", to_string_pretty(metric).unwrap());
+
+        // Get the Previous NuttX Hash (Last Successful Commit)
+        let nuttx_hash_prev = metric["nuttx_hash_prev"].as_str().unwrap();
+        let url = metric["url"].as_str().unwrap();
         let board = metric["board"].as_str().unwrap();
         let config = metric["config"].as_str().unwrap();
         let user = metric["user"].as_str().unwrap();
         let msg = metric["msg"].as_str().unwrap_or("");
         let config_upper = config.to_uppercase();
         let target = format!("{board}:{config}");
+        println!("nuttx_hash_prev={nuttx_hash_prev}");
+        println!("url={url}");
         println!("board={board}");
         println!("config={config}");
         println!("user={user}");
         println!("msg=\n<<\n{msg}\n>>");
+
+        // Get the Breaking PR from GitHub, based on the Breaking Commit
+        // https://docs.github.com/en/rest/commits/commits?apiVersion=2022-11-28#list-pull-requests-associated-with-a-commit
+        let client = reqwest::Client::new();
+        let github = format!("https://api.github.com/repos/apache/nuttx/commits/{nuttx_hash_prev}/pulls");
+        let res = client
+            .get(github)
+            .header("User-Agent", "nuttx-rewind-notify")
+            .header("Accept", "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2022-11-28")
+            .send()
+            .await?;
+        println!("res={res:?}");
+        if !res.status().is_success() {
+            println!("*** GitHub Failed: {user} @ {target}");
+            sleep(Duration::from_secs(30));
+            continue;
+        }
+        // println!("Status: {}", res.status());
+        // println!("Headers:\n{:#?}", res.headers());
+        let body = res.text().await?;
+        println!("Body: {body}");
+
+        // Read the Build Log
+
+        // Extract the Build Log
 
         // Compose the Mastodon Post as...
         // rv-virt : CITEST - Build Failed (NuttX)
@@ -123,6 +152,8 @@ Build History: https://nuttx-dashboard.org/d/fe2q876wubc3kc/nuttx-build-history?
                 }
             }
         }
+
+        break; ////
 
         // Post to Mastodon
         let token = std::env::var("MASTODON_TOKEN")
