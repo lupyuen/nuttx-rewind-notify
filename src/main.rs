@@ -225,17 +225,34 @@ Build History: https://nuttx-dashboard.org/d/fe2q876wubc3kc/nuttx-build-history?
 async fn extract_log(url: &str) -> Result<(), Box<dyn std::error::Error>> {
     // `raw_url` looks like "https://gitlab.com/lupyuen/nuttx-build-log/-/snippets/4799962/raw/"
     let parsed_url = Url::parse(url).unwrap();
-    let line = parsed_url.fragment().unwrap();  // "L85"
+    let start_line = parsed_url.fragment().unwrap();  // "L85"
+    let start_linenum = start_line[1..].parse::<usize>().unwrap();  // 85
     let mut parsed_url = parsed_url.clone();
     parsed_url.set_fragment(None); // "https://gitlab.com/lupyuen/nuttx-build-log/-/snippets/4799962"
     let base_url = parsed_url.as_str();  
     let raw_url = format!("{base_url}/raw/");
-    println!("line={}", line);
     println!("raw_url={raw_url}");
 
     let log = reqwest::get(raw_url).await?
         .text().await?;
-    println!("log=\n{log}");
+    // println!("log=\n{log}");
+
+    // Extract Log from Start Line Number till "===== Error: Test Failed" or "===== Test OK"
+    let lines = &log.split('\n').collect::<Vec<_>>();
+    for (linenum, line) in lines.into_iter().enumerate() {
+        if linenum < start_linenum { continue; }
+        if line.starts_with("===== ") {
+            // Extract the previous 10 lines
+            break;
+        } else if line.starts_with("+ ") {
+            let line = &line[2..];
+            if line.starts_with("[[") ||  // Skip "[[ 657247bda89d60112d79bb9b8d223eca5f9641b5 != '' ]]"
+                line.starts_with("set ")  // Skip "set +x"
+                { continue; }
+            println!("line={line}");
+        }
+    }
+
     Ok(())
 }
 
@@ -304,7 +321,6 @@ spawn qemu-system-riscv64 -semihosting -M virt,aclint=on -cpu rv64 -kernel nuttx
 OpenSBI v1.3
 >>
 
-Extract Log from Line Number till "===== "
 Extract 5 lines:
 "+ git reset "
 "NuttX Source: "
