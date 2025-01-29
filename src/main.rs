@@ -13,6 +13,7 @@ use serde_json::{
     to_string_pretty,
     Value,
 };
+use url::Url;
 
 // Remembers the Mastodon Posts for All Builds:
 // {
@@ -130,6 +131,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Read the Build Log
 
         // Extract the Build Log
+        extract_log(url).await?;
 
         // Compose the Mastodon Post as...
         // rv-virt : CITEST - Build Failed (NuttX)
@@ -217,3 +219,99 @@ Build History: https://nuttx-dashboard.org/d/fe2q876wubc3kc/nuttx-build-history?
     // Return OK
     Ok(())
 }
+
+/// Extract the important bits from the Build / Test Log.
+/// `url` looks like "https://gitlab.com/lupyuen/nuttx-build-log/-/snippets/4799962#L85"
+async fn extract_log(url: &str) -> Result<(), Box<dyn std::error::Error>> {
+    // `raw_url` looks like "https://gitlab.com/lupyuen/nuttx-build-log/-/snippets/4799962/raw/"
+    let parsed_url = Url::parse(url).unwrap();
+    let line = parsed_url.fragment().unwrap();  // "L85"
+    let mut parsed_url = parsed_url.clone();
+    parsed_url.set_fragment(None); // "https://gitlab.com/lupyuen/nuttx-build-log/-/snippets/4799962"
+    let base_url = parsed_url.as_str();  
+    let raw_url = format!("{base_url}/raw/");
+    println!("line={}", line);
+    println!("raw_url={raw_url}");
+
+    let log = reqwest::get(raw_url).await?
+        .text().await?;
+    println!("log=\n{log}");
+    Ok(())
+}
+
+/*
+url="https://gitlab.com/lupyuen/nuttx-build-log/-/snippets/4799962#L85"
+
+Starting at Line 85: Search for lines starting with "+ " or "spawn"
+
+wget https://gitlab.com/lupyuen/nuttx-build-log/-/snippets/4799962/raw/main/ci-unknown.log
+grep "^+ " ci-unknown.log
+
+<<
++ /home/luppy/nuttx-build-farm/build-test-knsh64.sh 657247bda89d60112d79bb9b8d223eca5f9641b5 a6b9e718460a56722205c2a84a9b07b94ca664aa
++ nuttx_hash=657247bda89d60112d79bb9b8d223eca5f9641b5
++ apps_hash=a6b9e718460a56722205c2a84a9b07b94ca664aa
++ neofetch
++ tmp_path=/tmp/build-test-knsh64
++ rm -rf /tmp/build-test-knsh64
++ mkdir /tmp/build-test-knsh64
++ cd /tmp/build-test-knsh64
++ git clone https://github.com/apache/nuttx
++ git clone https://github.com/apache/nuttx-apps apps
++ [[ 657247bda89d60112d79bb9b8d223eca5f9641b5 != '' ]]
++ pushd nuttx
++ git reset --hard 657247bda89d60112d79bb9b8d223eca5f9641b5
++ popd
++ [[ a6b9e718460a56722205c2a84a9b07b94ca664aa != '' ]]
++ pushd apps
++ git reset --hard a6b9e718460a56722205c2a84a9b07b94ca664aa
++ popd
++ set +x
++ riscv-none-elf-gcc -v
++ rustup --version
++ rustc --version
++ cd nuttx
++ tools/configure.sh rv-virt:knsh64
++ make -j
++ riscv-none-elf-size nuttx
++ make -j export
++ ./tools/mkimport.sh -z -x ../nuttx/nuttx-export-12.8.0.tar.gz
++ make -j import
++ popd
++ qemu-system-riscv64 --version
++ script=qemu-riscv-knsh64
++ wget https://raw.githubusercontent.com/lupyuen/nuttx-riscv64/main/qemu-riscv-knsh64.exp
+spawn qemu-system-riscv64 -semihosting -M virt,aclint=on -cpu rv64 -kernel nuttx -nographic
++ expect ./qemu-riscv-knsh64.exp
+>>
+
+Include Commit Info
+<<
++ git reset --hard 657247bda89d60112d79bb9b8d223eca5f9641b5
+HEAD is now at 657247bda8 libc/modlib: preprocess gnu-elf.ld
+NuttX Source: https://github.com/apache/nuttx/tree/657247bda89d60112d79bb9b8d223eca5f9641b5
+NuttX Apps: https://github.com/apache/nuttx-apps/tree/a6b9e718460a56722205c2a84a9b07b94ca664aa
+>>
+
+Include QEMU and OpenSBI version
+<<
++ qemu-system-riscv64 --version
+QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.4)
+
++ expect ./qemu-riscv-knsh64.exp
+spawn qemu-system-riscv64 -semihosting -M virt,aclint=on -cpu rv64 -kernel nuttx -nographic
+
+OpenSBI v1.3
+>>
+
+Extract Log from Line Number till "===== "
+Extract 5 lines:
+"+ git reset "
+"NuttX Source: "
+"NuttX Apps: "
+"+ qemu"
+"+ expect ./qemu"
+
+Search for lines starting with "===== Error: Test Failed" or "===== Test OK"
+Backtrack last 10 lines
+ */
