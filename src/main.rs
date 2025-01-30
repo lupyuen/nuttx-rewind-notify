@@ -131,7 +131,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let pull_requests: Value = serde_json::from_str(&body).unwrap();
         // println!("pull_requests=\n{pull_requests:#}");
         let pr = &pull_requests[0];
-        let pr_url = pr["url"].as_str().unwrap();
+        let pr_url = pr["html_url"].as_str().unwrap();
         let pr_user = pr["user"]["login"].as_str().unwrap();
         println!("pr_url={pr_url}");
         println!("pr_user={pr_user}");
@@ -147,9 +147,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             r#"Sorry @{pr_user}: The above PR is failing for {TARGET}. Could you please take a look? Thanks!"#
         ));
         log.push(format!(
-            r#"[(Earlier Commit is OK)]({pr_url})"#
+            r#"[(Earlier Commit is OK)]({previous_url})"#
+        ));
+        log.push(format!(
+            r#"[(See the Build History)](https://nuttx-dashboard.org/d/fe2q876wubc3kc/nuttx-build-history?var-board={board}&var-config={config})"#
         ));
         println!("log=\n{}", log.join("\n"));
+        let msg = log.join("\n");
 
         // Compose the Mastodon Post as...
         // rv-virt : CITEST - Build Failed (NuttX)
@@ -159,6 +163,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut status = format!(
             r##"
 {board} : {config_upper} - Build Failed ({user})
+Breaking PR: {pr_url}
 NuttX Dashboard: https://nuttx-dashboard.org
 Build History: https://nuttx-dashboard.org/d/fe2q876wubc3kc/nuttx-build-history?var-board={board}&var-config={config}
 
