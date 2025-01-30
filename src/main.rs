@@ -248,7 +248,8 @@ async fn extract_log(url: &str) -> Result<(), Box<dyn std::error::Error>> {
         if linenum < start_linenum { continue; }
         if line.starts_with("===== ") {
             // Extract the previous 10 lines
-            for i in (linenum - 9)..(linenum + 1) { output_line.set(i, true); }
+            for i in (linenum - 10)..linenum { output_line.set(i, true); }
+            for i in (linenum - 10)..linenum { println!("{}", lines[i]); }
             break;
         } else if 
             // Skip these lines
@@ -282,15 +283,21 @@ async fn extract_log(url: &str) -> Result<(), Box<dyn std::error::Error>> {
             line.starts_with("QEMU emulator") ||  // "QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.4)"
             line.starts_with("OpenSBI") ||  // "OpenSBI v1.3"
             false {
-            // "+ " becomes "$ "
-            let line =
-                if line.contains("+ pushd ../apps") { "$ pushd ../apps".into() }
-                else if line.starts_with("spawn ") { line.replace("spawn ", "$ ") }
-                else if line.starts_with("+ ") { "$ ".to_string() + &line[2..] }
-                else { line.to_string() };
             output_line.set(linenum, true);
             println!("line={line}");
         }
+    }
+
+    // Print the Extracted Log Lines
+    for (linenum, line) in lines.into_iter().enumerate() {
+        if !output_line.get(linenum).unwrap() { continue; }
+        // "+ " becomes "$ "
+        let line =
+            if line.contains("+ pushd ../apps") { "$ pushd ../apps".into() }
+            else if line.starts_with("spawn ") { line.replace("spawn ", "$ ") }
+            else if line.starts_with("+ ") { "$ ".to_string() + &line[2..] }
+            else { line.to_string() };
+        println!("{linenum}: {line}");
     }
     Ok(())
 }
