@@ -39,7 +39,6 @@ struct Args {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Init the Logger and Command-Line Args
     env_logger::init();
-    // let args = Args::parse();
 
     // Fetch the Breaking Commit from Prometheus
     let query = format!(r##"
@@ -168,8 +167,15 @@ Build History: https://nuttx-dashboard.org/d/fe2q876wubc3kc/nuttx-build-history?
 
 {msg}
             "##);
-        status.truncate(512);  // Mastodon allows only 500 chars
         println!("status=\n{}", &status);
+
+        // Upload the Complete Status as GitLab Snippet
+        let snippet_url = create_snippet(&status).await?;
+        println!("snippet_url=\n{}", &snippet_url);
+        status.insert_str(0, &format!("Details: {snippet_url}\n"));
+
+        // Post the Truncated Status to Mastodon
+        status.truncate(512);  // Mastodon allows only 500 chars
         let mut params = Vec::new();
         params.push(("status", status));
 
@@ -347,4 +353,51 @@ async fn search_builds_by_hash(commit: &str) -> Result<Value, Box<dyn std::error
     let data: Value = serde_json::from_str(&body).unwrap();
     let builds = &data["data"]["result"];
     Ok(builds.clone())
+}
+
+// Create a GitLab Snippet. Returns the Snippet URL.
+// https://docs.gitlab.com/ee/api/snippets.html#create-new-snippet
+async fn create_snippet(content: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let user = "lupyuen";
+    let repo = "nuttx-build-log";
+    let body = r#"
+{
+  "title": "This is a snippet",
+  "description": "Hello World snippet",
+  "visibility": "public",
+  "files": [
+    {
+      "content": "Hello world",
+      "file_path": "test.txt"
+    }
+  ]
+}
+    "#;
+    let mut body: Value = serde_json::from_str(&body).unwrap();
+    body["files"][0]["content"] = content.into();
+
+    let token = std::env::var("GITLAB_TOKEN")
+        .expect("GITLAB_TOKEN env variable is required");
+    let client = reqwest::Client::new();
+    let gitlab = format!("https://gitlab.com/api/v4/projects/{user}%2F{repo}/snippets");
+    let res = client
+        .post(gitlab)
+        .header("Content-Type", "application/json")
+        .header("PRIVATE-TOKEN", token)      
+        .body(body.to_string())
+        .send()
+        .await?;
+    println!("res={res:?}");
+    if !res.status().is_success() {
+        println!("*** Create Snippet Failed: {user} @ {repo}");
+        sleep(Duration::from_secs(30));
+        //// continue;
+    }
+    // println!("Status: {}", res.status());
+    // println!("Headers:\n{:#?}", res.headers());
+    let response = res.text().await?;
+    println!("response={response}");
+    let response: Value = serde_json::from_str(&response).unwrap();
+    let url = response["web_url"].as_str().unwrap();
+    Ok(url.into())
 }
