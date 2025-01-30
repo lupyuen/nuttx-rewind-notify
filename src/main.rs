@@ -291,11 +291,10 @@ async fn extract_log(url: &str) -> Result<(), Box<dyn std::error::Error>> {
     // Print the Extracted Log Lines
     for (linenum, line) in lines.into_iter().enumerate() {
         if !output_line.get(linenum).unwrap() { continue; }
-        // "+ " becomes "$ "
         let line =
-            if line.contains("+ pushd ../apps") { "$ pushd ../apps".into() }
-            else if line.starts_with("spawn ") { line.replace("spawn ", "$ ") }
-            else if line.starts_with("+ ") { "$ ".to_string() + &line[2..] }
+            if line.contains("+ pushd ../apps") { "$ pushd ../apps".into() }  // "CC:  ... + pushd ../apps"
+            else if line.starts_with("spawn ") { line.replace("spawn ", "$ ") }  // "spawn qemu-system-riscv64 -semihosting -M virt,aclint=on -cpu rv64 -kernel nuttx -nographic"
+            else if line.starts_with("+ ") { "$ ".to_string() + &line[2..] }  // "+ " becomes "$ "
             else { line.to_string() };
         println!("{linenum}: {line}");
     }
