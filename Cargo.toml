@@ -11,6 +11,7 @@ keywords = ["nuttx", "rtos", "ci", "prometheus", "mastodon"]
 categories = ["command-line-utilities"]
 
 [dependencies]
+bit-vec = "0.8.0"
 clap = { version = "4.5.18", features = ["derive"] }
 env_logger = "0.11.5"
 log = "0.4.22"

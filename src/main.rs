@@ -7,6 +7,7 @@ use std::{
     thread::sleep,
     time::Duration,
 };
+use bit_vec::BitVec;
 use clap::Parser;
 use serde_json::{
     json,
@@ -190,6 +191,7 @@ Build History: https://nuttx-dashboard.org/d/fe2q876wubc3kc/nuttx-build-history?
         println!("Body: {body}");
 
         // Remember the Mastodon Post ID (Status ID)
+        // Sorry we won't save the Mastodon Post ID, to prevent conflict with nuttx-prometheus-to-mastodon
         let status: Value = serde_json::from_str(&body).unwrap();
         let status_id = status["id"].as_str().unwrap();
         println!("status_id={status_id}");
@@ -206,12 +208,6 @@ Build History: https://nuttx-dashboard.org/d/fe2q876wubc3kc/nuttx-build-history?
             all_builds[&target]["users"] = json!([user]);
         }
 
-        // Save the Mastodon Posts for All Builds
-        let json = to_string_pretty(&all_builds).unwrap();
-        let mut file = File::create(ALL_BUILDS_FILENAME).unwrap();
-        file.write_all(json.as_bytes()).unwrap();
-        println!("\nall_builds=\n{json}\n");
-
         // Wait a while
         sleep(Duration::from_secs(30));
     }
@@ -221,9 +217,9 @@ Build History: https://nuttx-dashboard.org/d/fe2q876wubc3kc/nuttx-build-history?
 }
 
 /// Extract the important bits from the Build / Test Log.
-/// `url` looks like "https://gitlab.com/lupyuen/nuttx-build-log/-/snippets/4799962#L85"
+/// url looks like "https://gitlab.com/lupyuen/nuttx-build-log/-/snippets/4799962#L85"
 async fn extract_log(url: &str) -> Result<(), Box<dyn std::error::Error>> {
-    // `raw_url` looks like "https://gitlab.com/lupyuen/nuttx-build-log/-/snippets/4799962/raw/"
+    // raw_url looks like "https://gitlab.com/lupyuen/nuttx-build-log/-/snippets/4799962/raw/"
     let parsed_url = Url::parse(url).unwrap();
     let start_line = parsed_url.fragment().unwrap();  // "L85"
     let start_linenum = start_line[1..].parse::<usize>().unwrap();  // 85
@@ -233,91 +229,61 @@ async fn extract_log(url: &str) -> Result<(), Box<dyn std::error::Error>> {
     let raw_url = format!("{base_url}/raw/");
     println!("raw_url={raw_url}");
 
+    // output_line[i] is True if Line #i should be extracted for output (starts at i=1)
     let log = reqwest::get(raw_url).await?
         .text().await?;
     // println!("log=\n{log}");
+    let lines = &log.split('\n').collect::<Vec<_>>();
+    let mut output_line = BitVec::from_elem(lines.len() + 1, false);
 
     // Extract Log from Start Line Number till "===== Error: Test Failed" or "===== Test OK"
-    let lines = &log.split('\n').collect::<Vec<_>>();
     for (linenum, line) in lines.into_iter().enumerate() {
         if linenum < start_linenum { continue; }
         if line.starts_with("===== ") {
             // Extract the previous 10 lines
+            for i in (linenum - 9)..(linenum + 1) { output_line.set(i, true); }
             break;
-        } else if line.starts_with("+ ") {
-            // Search for lines starting with "+ " or "spawn"
-            let line = &line[2..];
-            if line.starts_with("[[") ||  // Skip "[[ 657247bda89d60112d79bb9b8d223eca5f9641b5 != '' ]]"
-                line.starts_with("set ")  // Skip "set +x"
-                { continue; }
+        } else if 
+            // Skip these lines
+            line.contains("/nuttx-build-farm/") ||  // "/home/luppy/nuttx-build-farm/build-test-knsh64.sh 657247bda89d60112d79bb9b8d223eca5f9641b5 a6b9e718460a56722205c2a84a9b07b94ca664aa"
+            line.starts_with("+ [[") ||  // "[[ 657247bda89d60112d79bb9b8d223eca5f9641b5 != '' ]]"
+            line.starts_with("+ set ") ||  // "set +x"
+            line.starts_with("+ nuttx_hash") || // "nuttx_hash=657247bda89d60112d79bb9b8d223eca5f9641b5"
+            line.starts_with("+ apps_hash") || // "apps_hash=a6b9e718460a56722205c2a84a9b07b94ca664aa"
+            line.starts_with("+ neofetch") || // "neofetch"
+            line.starts_with("+ tmp_path") || // "tmp_path=/tmp/build-test-knsh64"
+            line.starts_with("+ rm -rf /tmp/") ||  // "rm -rf /tmp/build-test-knsh64"
+            line.starts_with("+ mkdir /tmp/") ||  // "mkdir /tmp/build-test-knsh64"
+            line.starts_with("+ cd /tmp/") ||  // "cd /tmp/build-test-knsh64"
+            line.starts_with("+ riscv-none-elf-gcc -v") ||  // "riscv-none-elf-gcc -v"
+            line.starts_with("+ rustup --version") ||  // "rustup --version"
+            line.starts_with("+ rustc --version") ||  // "rustc --version"
+            line.starts_with("+ riscv-none-elf-size") ||  // "riscv-none-elf-size nuttx"
+            line.starts_with("+ script=") ||  // "script=qemu-riscv-knsh64"
+            line.starts_with("+ wget ") ||  // "wget https://raw.githubusercontent.com/lupyuen/nuttx-riscv64/main/qemu-riscv-knsh64.exp"
+            line.starts_with("+ expect ") ||  // "expect ./qemu-riscv-knsh64.exp"
+            false {
+            continue;
+        } else if
+            // Output these lines
+            line.starts_with("+ ") ||
+            line.starts_with("HEAD is now") ||  // "HEAD is now at 657247bda8 libc/modlib: preprocess gnu-elf.ld"
+            line.starts_with("NuttX Source") ||  // "NuttX Source: https://github.com/apache/nuttx/tree/657247bda89d60112d79bb9b8d223eca5f9641b5"
+            line.starts_with("NuttX Apps") ||  // "NuttX Apps: https://github.com/apache/nuttx-apps/tree/a6b9e718460a56722205c2a84a9b07b94ca664aa"
+            line.contains("+ pushd ../apps") || // "CC:  ... + pushd ../apps"
+            line.starts_with("spawn") ||  // "spawn qemu-system-riscv64 -semihosting -M virt,aclint=on -cpu rv64 -kernel nuttx -nographic"
+            line.starts_with("QEMU emulator") ||  // "QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.4)"
+            line.starts_with("OpenSBI") ||  // "OpenSBI v1.3"
+            false {
+            // "+ " becomes "$ "
+            let line =
+                if line.contains("+ pushd ../apps") { "$ pushd ../apps".into() }
+                else if line.starts_with("spawn ") { line.replace("spawn ", "$ ") }
+                else if line.starts_with("+ ") { "$ ".to_string() + &line[2..] }
+                else { line.to_string() };
+            output_line.set(linenum, true);
             println!("line={line}");
         }
-        /*
-Include Commit Info
-<<
-+ git reset --hard 657247bda89d60112d79bb9b8d223eca5f9641b5
-HEAD is now at 657247bda8 libc/modlib: preprocess gnu-elf.ld
-NuttX Source: https://github.com/apache/nuttx/tree/657247bda89d60112d79bb9b8d223eca5f9641b5
-NuttX Apps: https://github.com/apache/nuttx-apps/tree/a6b9e718460a56722205c2a84a9b07b94ca664aa
->>
-
-Include QEMU and OpenSBI version
-<<
-+ qemu-system-riscv64 --version
-QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.4)
-
-+ expect ./qemu-riscv-knsh64.exp
-spawn qemu-system-riscv64 -semihosting -M virt,aclint=on -cpu rv64 -kernel nuttx -nographic
-
-OpenSBI v1.3
->>
-
-Extract 5 lines:
-"+ git reset "
-"NuttX Source: "
-"NuttX Apps: "
-"+ qemu"
-"+ expect ./qemu"         
-*/
     }
-
     Ok(())
 }
-
-/*
-+ /home/luppy/nuttx-build-farm/build-test-knsh64.sh 657247bda89d60112d79bb9b8d223eca5f9641b5 a6b9e718460a56722205c2a84a9b07b94ca664aa
-+ nuttx_hash=657247bda89d60112d79bb9b8d223eca5f9641b5
-+ apps_hash=a6b9e718460a56722205c2a84a9b07b94ca664aa
-+ neofetch
-+ tmp_path=/tmp/build-test-knsh64
-+ rm -rf /tmp/build-test-knsh64
-+ mkdir /tmp/build-test-knsh64
-+ cd /tmp/build-test-knsh64
-+ git clone https://github.com/apache/nuttx
-+ git clone https://github.com/apache/nuttx-apps apps
-+ [[ 657247bda89d60112d79bb9b8d223eca5f9641b5 != '' ]]
-+ pushd nuttx
-+ git reset --hard 657247bda89d60112d79bb9b8d223eca5f9641b5
-+ popd
-+ [[ a6b9e718460a56722205c2a84a9b07b94ca664aa != '' ]]
-+ pushd apps
-+ git reset --hard a6b9e718460a56722205c2a84a9b07b94ca664aa
-+ popd
-+ set +x
-+ riscv-none-elf-gcc -v
-+ rustup --version
-+ rustc --version
-+ cd nuttx
-+ tools/configure.sh rv-virt:knsh64
-+ make -j
-+ riscv-none-elf-size nuttx
-+ make -j export
-+ ./tools/mkimport.sh -z -x ../nuttx/nuttx-export-12.8.0.tar.gz
-+ make -j import
-+ popd
-+ qemu-system-riscv64 --version
-+ script=qemu-riscv-knsh64
-+ wget https://raw.githubusercontent.com/lupyuen/nuttx-riscv64/main/qemu-riscv-knsh64.exp
-spawn qemu-system-riscv64 -semihosting -M virt,aclint=on -cpu rv64 -kernel nuttx -nographic
-+ expect ./qemu-riscv-knsh64.exp
- */
