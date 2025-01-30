@@ -236,8 +236,8 @@ Build History: https://nuttx-dashboard.org/d/fe2q876wubc3kc/nuttx-build-history?
             all_builds[&target]["users"] = json!([user]);
         }
 
-        // Wait a while
-        sleep(Duration::from_secs(30));
+        // Handle only the First Breaking Commit
+        break;
     }
 
     // Return OK
