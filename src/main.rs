@@ -152,7 +152,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         log.push(format!(
             r#"[(See the Build History)](https://nuttx-dashboard.org/d/fe2q876wubc3kc/nuttx-build-history?var-board={board}&var-config={config})"#
         ));
-        println!("log=\n{}", log.join("\n"));
+        // println!("log=\n{}", log.join("\n"));
         let msg = log.join("\n");
 
         // Compose the Mastodon Post as...
@@ -170,6 +170,7 @@ Build History: https://nuttx-dashboard.org/d/fe2q876wubc3kc/nuttx-build-history?
 {msg}
             "##);
         status.truncate(512);  // Mastodon allows only 500 chars
+        println!("status=\n{}", &status);
         let mut params = Vec::new();
         params.push(("status", status));
 
