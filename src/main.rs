@@ -139,7 +139,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Read the Build Log
 
         // Extract the Build Log
-        extract_log(url).await?;
+        let mut log = extract_log(url).await?;
+        log.insert(0, "```text".into());
+        log.push("```".into());
+        log.insert(0, url.into());
+        log.insert(0, format!(
+            r#"Sorry @{pr_user}: The above PR is failing for {TARGET}. Could you please take a look? Thanks!"#
+        ));
+        log.push(format!(
+            r#"[(Earlier Commit is OK)]({pr_url})"#
+        ));
+        println!("log=\n{}", log.join("\n"));
 
         // Compose the Mastodon Post as...
         // rv-virt : CITEST - Build Failed (NuttX)
@@ -225,7 +235,7 @@ Build History: https://nuttx-dashboard.org/d/fe2q876wubc3kc/nuttx-build-history?
 
 /// Extract the important bits from the Build / Test Log.
 /// url looks like "https://gitlab.com/lupyuen/nuttx-build-log/-/snippets/4799962#L85"
-async fn extract_log(url: &str) -> Result<(), Box<dyn std::error::Error>> {
+async fn extract_log(url: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     // raw_url looks like "https://gitlab.com/lupyuen/nuttx-build-log/-/snippets/4799962/raw/"
     let parsed_url = Url::parse(url).unwrap();
     let start_line = parsed_url.fragment().unwrap();  // "L85"
@@ -249,7 +259,7 @@ async fn extract_log(url: &str) -> Result<(), Box<dyn std::error::Error>> {
         if line.starts_with("===== ") {
             // Extract the previous 10 lines
             for i in (linenum - 10)..linenum { output_line.set(i, true); }
-            for i in (linenum - 10)..linenum { println!("{}", lines[i]); }
+            // for i in (linenum - 10)..linenum { println!("{}", lines[i]); }
             break;
         } else if 
             // Skip these lines
@@ -284,11 +294,12 @@ async fn extract_log(url: &str) -> Result<(), Box<dyn std::error::Error>> {
             line.starts_with("OpenSBI") ||  // "OpenSBI v1.3"
             false {
             output_line.set(linenum, true);
-            println!("line={line}");
+            // println!("line={line}");
         }
     }
 
-    // Print the Extracted Log Lines
+    // Consolidate the Extracted Log Lines
+    let mut msg: Vec<String> = vec![];
     for (linenum, line) in lines.into_iter().enumerate() {
         if !output_line.get(linenum).unwrap() { continue; }
         let line =
@@ -297,8 +308,9 @@ async fn extract_log(url: &str) -> Result<(), Box<dyn std::error::Error>> {
             else if line.starts_with("+ ") { "$ ".to_string() + &line[2..] }  // "+ " becomes "$ "
             else { line.to_string() };
         println!("{linenum}: {line}");
+        msg.push(line);
     }
-    Ok(())
+    Ok(msg)
 }
 
 // Search the NuttX Commit in Prometheus
@@ -331,3 +343,28 @@ async fn search_builds_by_hash(commit: &str) -> Result<Value, Box<dyn std::error
     let builds = &data["data"]["result"];
     Ok(builds.clone())
 }
+
+/*
+https://github.com/apache/nuttx/pull/15444#issuecomment-2585595498
+Sorry @yf13: This PR is causing "Instruction page fault" for rv-virt:knsh64. Wonder if there's something I missed in my testing steps? Thanks!
+
+https://gist.github.com/lupyuen/60d54514ce9a8589b56ed6207c356d95#file-special-qemu-riscv-knsh64-log-L1396
++ git reset --hard 657247bda89d60112d79bb9b8d223eca5f9641b5
+HEAD is now at 657247bda8 libc/modlib: preprocess gnu-elf.ld
+NuttX Source: https://github.com/apache/nuttx/tree/657247bda89d60112d79bb9b8d223eca5f9641b5
+NuttX Apps: https://github.com/apache/nuttx-apps/tree/a6b9e718460a56722205c2a84a9b07b94ca664aa
++ tools/configure.sh rv-virt:knsh64
++ make -j
++ make export
++ pushd ../apps
++ ./tools/mkimport.sh -z -x ../nuttx/nuttx-export-12.8.0.tar.gz
++ make import
++ popd
++ qemu-system-riscv64 -semihosting -M virt,aclint=on -cpu rv64 -kernel nuttx -nographic
+QEMU emulator version 9.2.0
+OpenSBI v1.5.1
+ABC
+riscv_exception: EXCEPTION: Instruction page fault. MCAUSE: 000000000000000c, EPC: 000000018000001a, MTVAL: 000000018000001a
+riscv_exception: Segmentation fault in PID 2: /system/bin/init
+(Earlier Commit is OK)
+ */
