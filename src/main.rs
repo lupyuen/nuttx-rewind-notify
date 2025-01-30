@@ -16,6 +16,9 @@ use serde_json::{
 };
 use url::Url;
 
+// NuttX Target to be processed
+const TARGET: &str = "rv-virt:knsh64_test5";
+
 // Remembers the Mastodon Posts for All Builds:
 // {
 //   "rv-virt:citest" : {
@@ -39,12 +42,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let args = Args::parse();
 
     // Fetch the Breaking Commit from Prometheus
-    let query = r##"
-        build_score{
-            target="rv-virt:knsh64_test5",
+    let query = format!(r##"
+        build_score{{
+            target="{TARGET}",
             build_score_prev="1"
-        } == 0
-    "##;
+        }} == 0
+    "##);
     println!("query={query}");
     let params = [("query", query)];
     let client = reqwest::Client::new();
@@ -98,7 +101,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // println!("msg=\n<<\n{msg}\n>>");
 
         // Get the Previous Log URL (Last Successful Commit)
-        // TODO
+        let previous_builds = search_builds_by_hash(nuttx_hash_prev).await?;
+        let previous_build = &previous_builds[0];
+        let previous_url = &previous_build["metric"]["url"].as_str().unwrap();
+        // println!("previous_build=\n{previous_build:#}");
+        println!("previous_url={previous_url}");
 
         // Get the Breaking PR from GitHub, based on the Breaking Commit
         // https://docs.github.com/en/rest/commits/commits?apiVersion=2022-11-28#list-pull-requests-associated-with-a-commit
@@ -122,7 +129,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let body = res.text().await?;
         // println!("Body: {body}");
         let pull_requests: Value = serde_json::from_str(&body).unwrap();
-        println!("pull_requests=\n{pull_requests:#}");
+        // println!("pull_requests=\n{pull_requests:#}");
         let pr = &pull_requests[0];
         let pr_url = pr["url"].as_str().unwrap();
         let pr_user = pr["user"]["login"].as_str().unwrap();
@@ -286,4 +293,35 @@ async fn extract_log(url: &str) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     Ok(())
+}
+
+// Search the NuttX Commit in Prometheus
+async fn search_builds_by_hash(commit: &str) -> Result<Value, Box<dyn std::error::Error>> {
+    let query = format!(r##"
+        build_score{{
+            target="{TARGET}",
+            nuttx_hash="{commit}"
+        }}
+    "##);
+    println!("query={query}");
+    let params = [("query", query)];
+    let client = reqwest::Client::new();
+    let prometheus = "http://localhost:9090/api/v1/query";
+    let res = client
+        .post(prometheus)
+        .form(&params)
+        .send()
+        .await?;
+    println!("res={res:?}");
+    if !res.status().is_success() {
+        println!("*** Prometheus Failed");
+        sleep(Duration::from_secs(1));
+    }
+    // println!("Status: {}", res.status());
+    // println!("Headers:\n{:#?}", res.headers());
+    let body = res.text().await?;
+    // println!("Body: {body}");
+    let data: Value = serde_json::from_str(&body).unwrap();
+    let builds = &data["data"]["result"];
+    Ok(builds.clone())
 }
