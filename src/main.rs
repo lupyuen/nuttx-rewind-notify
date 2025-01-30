@@ -3,7 +3,7 @@
 
 use std::{
     fs::File,
-    io::{BufReader, Write},
+    io::BufReader,
     thread::sleep,
     time::Duration,
 };
@@ -11,7 +11,6 @@ use bit_vec::BitVec;
 use clap::Parser;
 use serde_json::{
     json,
-    to_string_pretty,
     Value,
 };
 use url::Url;
@@ -387,7 +386,7 @@ async fn create_snippet(content: &str) -> Result<String, Box<dyn std::error::Err
         .body(body.to_string())
         .send()
         .await?;
-    println!("res={res:?}");
+    // println!("res={res:?}");
     if !res.status().is_success() {
         println!("*** Create Snippet Failed: {user} @ {repo}");
         sleep(Duration::from_secs(30));
@@ -396,7 +395,7 @@ async fn create_snippet(content: &str) -> Result<String, Box<dyn std::error::Err
     // println!("Status: {}", res.status());
     // println!("Headers:\n{:#?}", res.headers());
     let response = res.text().await?;
-    println!("response={response}");
+    // println!("response={response}");
     let response: Value = serde_json::from_str(&response).unwrap();
     let url = response["web_url"].as_str().unwrap();
     Ok(url.into())
