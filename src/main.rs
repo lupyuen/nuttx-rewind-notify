@@ -3,7 +3,7 @@
 
 use std::{
     fs::File,
-    io::BufReader,
+    io::{BufReader, Write},
     thread::sleep,
     time::Duration,
 };
@@ -11,6 +11,7 @@ use bit_vec::BitVec;
 use clap::Parser;
 use serde_json::{
     json,
+    to_string_pretty,
     Value,
 };
 use url::Url;
@@ -26,7 +27,7 @@ const TARGET: &str = "rv-virt:knsh64_test8";
 //   }
 //   "rv-virt:citest64" : ...
 // }
-const ALL_BUILDS_FILENAME: &str = "/tmp/nuttx-prometheus-to-mastodon.json";
+const ALL_BUILDS_FILENAME: &str = "/tmp/nuttx-rewind-notify.json";
 
 /// Command-Line Arguments
 #[derive(Parser, Debug)]
@@ -195,8 +196,6 @@ Build History: https://nuttx-dashboard.org/d/fe2q876wubc3kc/nuttx-build-history?
             }
         }
 
-        break; ////
-
         // Post to Mastodon
         let token = std::env::var("MASTODON_TOKEN")
             .expect("MASTODON_TOKEN env variable is required");
@@ -220,7 +219,6 @@ Build History: https://nuttx-dashboard.org/d/fe2q876wubc3kc/nuttx-build-history?
         println!("Body: {body}");
 
         // Remember the Mastodon Post ID (Status ID)
-        // Sorry we won't save the Mastodon Post ID, to prevent conflict with nuttx-prometheus-to-mastodon
         let status: Value = serde_json::from_str(&body).unwrap();
         let status_id = status["id"].as_str().unwrap();
         println!("status_id={status_id}");
@@ -237,6 +235,12 @@ Build History: https://nuttx-dashboard.org/d/fe2q876wubc3kc/nuttx-build-history?
             all_builds[&target]["users"] = json!([user]);
         }
 
+        // Save the Mastodon Posts for All Builds
+        let json = to_string_pretty(&all_builds).unwrap();
+        let mut file = File::create(ALL_BUILDS_FILENAME).unwrap();
+        file.write_all(json.as_bytes()).unwrap();
+        println!("\nall_builds=\n{json}\n");
+        
         // Handle only the First Breaking Commit
         break;
     }
@@ -365,13 +369,13 @@ async fn create_snippet(content: &str) -> Result<String, Box<dyn std::error::Err
     let repo = "nuttx-build-log";
     let body = r#"
 {
-  "title": "This is a snippet",
-  "description": "Hello World snippet",
+  "title": "NuttX Rewind Notify",
+  "description": "NuttX Breaking Commit",
   "visibility": "public",
   "files": [
     {
       "content": "Hello world",
-      "file_path": "test.txt"
+      "file_path": "breaking-commit.txt"
     }
   ]
 }
