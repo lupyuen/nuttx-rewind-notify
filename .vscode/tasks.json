@@ -7,7 +7,7 @@
             "label": "Build",
             "type": "shell",
 
-            "command": "set -e ; ./run.sh",
+            "command": "set -e ; set -x ; export PROMETHEUS_SERVER=luppys-mac-mini.local:9090 ; ./run.sh",
 
             "problemMatcher": "$rustc",
             "group": {

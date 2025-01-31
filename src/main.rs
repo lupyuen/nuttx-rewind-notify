@@ -16,7 +16,7 @@ use serde_json::{
 use url::Url;
 
 // NuttX Target to be processed
-const TARGET: &str = "rv-virt:knsh64_test5";
+const TARGET: &str = "rv-virt:knsh64_test8";
 
 // Remembers the Mastodon Posts for All Builds:
 // {
@@ -38,6 +38,8 @@ struct Args {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Init the Logger and Command-Line Args
     env_logger::init();
+    let prometheus_server = std::env::var("PROMETHEUS_SERVER")
+        .expect("PROMETHEUS_SERVER env variable is required");
 
     // Fetch the Breaking Commit from Prometheus
     let query = format!(r##"
@@ -49,7 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("query={query}");
     let params = [("query", query)];
     let client = reqwest::Client::new();
-    let prometheus = "http://localhost:9090/api/v1/query";
+    let prometheus = format!("http://{prometheus_server}/api/v1/query");
     let res = client
         .post(prometheus)
         .form(&params)
@@ -325,6 +327,8 @@ async fn extract_log(url: &str) -> Result<Vec<String>, Box<dyn std::error::Error
 
 // Search the NuttX Commit in Prometheus
 async fn search_builds_by_hash(commit: &str) -> Result<Value, Box<dyn std::error::Error>> {
+    let prometheus_server = std::env::var("PROMETHEUS_SERVER")
+        .expect("PROMETHEUS_SERVER env variable is required");
     let query = format!(r##"
         build_score{{
             target="{TARGET}",
@@ -334,7 +338,7 @@ async fn search_builds_by_hash(commit: &str) -> Result<Value, Box<dyn std::error
     println!("query={query}");
     let params = [("query", query)];
     let client = reqwest::Client::new();
-    let prometheus = "http://localhost:9090/api/v1/query";
+    let prometheus = format!("http://{prometheus_server}/api/v1/query");
     let res = client
         .post(prometheus)
         .form(&params)
@@ -390,7 +394,7 @@ async fn create_snippet(content: &str) -> Result<String, Box<dyn std::error::Err
     if !res.status().is_success() {
         println!("*** Create Snippet Failed: {user} @ {repo}");
         sleep(Duration::from_secs(30));
-        //// continue;
+        panic!();
     }
     // println!("Status: {}", res.status());
     // println!("Headers:\n{:#?}", res.headers());
