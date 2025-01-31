@@ -375,7 +375,7 @@ async fn create_snippet(content: &str) -> Result<String, Box<dyn std::error::Err
   "files": [
     {
       "content": "Hello world",
-      "file_path": "breaking-commit.txt"
+      "file_path": "nuttx-rewind-notify.txt"
     }
   ]
 }
