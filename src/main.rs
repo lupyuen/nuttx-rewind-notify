@@ -174,7 +174,7 @@ Build History: https://nuttx-dashboard.org/d/fe2q876wubc3kc/nuttx-build-history?
         // Upload the Complete Status as GitLab Snippet
         let snippet_url = create_snippet(&status).await?;
         println!("snippet_url=\n{}", &snippet_url);
-        status.insert_str(0, &format!("Details: {snippet_url}\n"));
+        status.insert_str(0, &format!("{target} Rewind - {snippet_url}\n"));
 
         // Post the Truncated Status to Mastodon
         status.truncate(512);  // Mastodon allows only 500 chars
