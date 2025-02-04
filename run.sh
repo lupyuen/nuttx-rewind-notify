@@ -18,6 +18,9 @@ set -e  ## Exit when any command fails
 
 set -x  ## Echo commands
 
+## Set the Prometheus Server
+export PROMETHEUS_SERVER=luppys-mac-mini.local:9090
+
 set +e  ## Ignore errors
 for (( ; ; )); do
   ## Post the Breaking Commit from Prometheus to Mastodon

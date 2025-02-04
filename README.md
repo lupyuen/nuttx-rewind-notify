@@ -85,10 +85,12 @@ Then we run this script to Post the Breaking Commit from Prometheus to Mastodon:
 ## Set the Rust Environment
 . $HOME/.cargo/env
 
+## Set the Prometheus Server
+export PROMETHEUS_SERVER=luppys-mac-mini.local:9090
+
 ## Post the Breaking Commit from Prometheus to Mastodon
 cargo run
 ```
-
 
 # Be Kind, Rewind!
 
