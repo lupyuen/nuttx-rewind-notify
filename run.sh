@@ -2,15 +2,20 @@
 ## Post the Breaking Commit from Prometheus to Mastodon
 
 set -e  ## Exit when any command fails
-set -x  ## Echo commands
 
-## Set the Access Tokens for Mastodon and GitLab
-## https://docs.joinmastodon.org/client/authorized/#token
-## export MASTODON_TOKEN=...
+## Set the GitLab Token, User and Repo for posting GitLab Snippets
 ## export GITLAB_TOKEN=...
-set +x  ## Disable Echo
-. ../mastodon-token.sh
-. ../gitlab-token.sh
+## export GITLAB_USER=lupyuen
+## export GITLAB_REPO=nuttx-build-log
+. $HOME/gitlab-token.sh
+
+## Set the Mastodon Token
+## export MASTODON_TOKEN=...
+. $HOME/mastodon-token.sh
+
+## Set the Rust Environment
+. $HOME/.cargo/env
+
 set -x  ## Echo commands
 
 set +e  ## Ignore errors

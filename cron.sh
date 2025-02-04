@@ -3,8 +3,10 @@
 
 set -e  ## Exit when any command fails
 
-## Set the GitLab Token
+## Set the GitLab Token, User and Repo for posting GitLab Snippets
 ## export GITLAB_TOKEN=...
+## export GITLAB_USER=lupyuen
+## export GITLAB_REPO=nuttx-build-log
 . $HOME/gitlab-token.sh
 
 ## Set the Mastodon Token
