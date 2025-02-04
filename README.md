@@ -1,4 +1,4 @@
-![Auto-Rewind for Daily Test (Apache NuttX RTOS)](https://lupyuen.github.io/images/rewind-title.jpg)
+![Auto-Rewind for Daily Test (Apache NuttX RTOS)](https://lupyuen.org/images/rewind-title.jpg)
 
 # Apache NuttX RTOS: Notify via Mastodon the results of Rewind Builds
 
