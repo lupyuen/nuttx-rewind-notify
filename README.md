@@ -2,6 +2,10 @@
 
 # Apache NuttX RTOS: Notify via Mastodon the results of Rewind Builds
 
+Read the article...
+
+- ["Auto-Rewind for Daily Test (Apache NuttX RTOS)"](https://lupyuen.org/articles/rewind.html)
+
 If the __Daily Test__ fails for [__Apache NuttX RTOS__](https://nuttx.apache.org/docs/latest/index.html)... Can we __Auto-Rewind__ and discover the __Breaking Commit__? Let's try this...
 
 1.  Every Day at 00:00 UTC: __Ubuntu Cron__ shall trigger a __Daily Build and Test__ of NuttX for __QEMU RISC-V__ _(knsh64 / 64-bit Kernel Build)_
